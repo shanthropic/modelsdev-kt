@@ -12,7 +12,7 @@ kotlin {
     explicitApi()
     applyDefaultHierarchyTemplate()
 
-    android {
+    androidLibrary {
         namespace = "dev.shantoislam.modelskt"
         compileSdk = 37
         minSdk = 30

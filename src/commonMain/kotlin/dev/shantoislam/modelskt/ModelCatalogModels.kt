@@ -1,10 +1,13 @@
 package dev.shantoislam.modelskt
 
+import kotlinx.serialization.Serializable
+
 public data class ModelKey(
     public val providerId: String,
     public val modelId: String,
 )
 
+@Serializable
 public enum class Support {
     SUPPORTED,
     UNSUPPORTED,
