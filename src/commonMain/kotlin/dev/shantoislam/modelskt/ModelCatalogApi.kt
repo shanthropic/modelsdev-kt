@@ -19,6 +19,7 @@ public sealed interface CatalogFetchResult {
 public interface ModelCatalogSource {
     public val sourceId: String
     public fun decode(payload: String): CatalogSnapshot
+    public fun isSnapshotCurrent(snapshot: CatalogSnapshot): Boolean = true
     public suspend fun fetch(validator: CatalogValidator? = null): CatalogFetchResult
 }
 
@@ -44,7 +45,9 @@ public interface ModelCatalog {
     public val state: StateFlow<ModelCatalogState>
     public fun snapshot(): CatalogSnapshot
     public fun find(key: ModelKey): ModelDescriptor?
+    public fun findCanonical(modelId: String): ModelDescriptor? = snapshot().findCanonical(modelId)
     public fun models(providerId: String): List<ModelDescriptor>
+    public fun canonicalModels(): List<ModelDescriptor> = snapshot().canonicalModels.values.toList()
     public fun providers(): List<ProviderDescriptor>
     public suspend fun initialize(): CatalogSnapshot
     public suspend fun refresh(force: Boolean = false): CatalogRefreshResult

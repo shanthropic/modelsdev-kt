@@ -22,7 +22,9 @@ public class DefaultModelCatalog(
 
     override fun snapshot(): CatalogSnapshot = current
     override fun find(key: ModelKey): ModelDescriptor? = current.find(key)
+    override fun findCanonical(modelId: String): ModelDescriptor? = current.findCanonical(modelId)
     override fun models(providerId: String): List<ModelDescriptor> = current.modelsForProvider(providerId)
+    override fun canonicalModels(): List<ModelDescriptor> = current.canonicalModels.values.toList()
     override fun providers(): List<ProviderDescriptor> = current.providers.values.toList()
 
     override suspend fun initialize(): CatalogSnapshot = refreshMutex.withLock {
@@ -42,15 +44,18 @@ public class DefaultModelCatalog(
 
     override suspend fun refresh(force: Boolean): CatalogRefreshResult = refreshMutex.withLock {
         val existing = cached
-        if (!force && existing != null && !isStale(existing)) {
+        if (!force && existing != null && !isStale(existing) && source.isSnapshotCurrent(current)) {
             return@withLock CatalogRefreshResult.Unchanged(current)
         }
         if (current.providers.isNotEmpty()) {
             mutableState.value = ModelCatalogState.Ready(current, stale = existing?.let(::isStale) ?: true, refreshing = true)
         }
         try {
-            when (val result = source.fetch(CatalogValidator(existing?.etag))) {
+            val snapshotCurrent = source.isSnapshotCurrent(current)
+            val validator = existing?.etag?.takeIf { snapshotCurrent }
+            when (val result = source.fetch(CatalogValidator(validator))) {
                 CatalogFetchResult.NotModified -> {
+                    check(snapshotCurrent) { "Catalog source returned not-modified for an incompatible snapshot" }
                     val refreshed = existing?.copy(refreshedAtEpochMillis = nowEpochMillis())
                     if (refreshed != null) {
                         cache?.write(refreshed)

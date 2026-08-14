@@ -1,6 +1,6 @@
 # models-kt
 
-`models-kt` is a Kotlin Multiplatform model-catalog library for Android and JVM. It provides normalized, provider-qualified model metadata, models.dev ingestion, conditional refresh, and portable caching without depending on an LLM runtime.
+`models-kt` is a Kotlin Multiplatform model-catalog library for Android and JVM. It provides normalized canonical and provider-qualified model metadata, models.dev ingestion, conditional refresh, and portable caching without depending on an LLM runtime.
 
 Package: `dev.shantoislam.modelskt`
 
@@ -18,6 +18,7 @@ catalog.initialize() // Loads a valid cached snapshot, if present.
 catalog.refresh()    // Uses ETag revalidation and retains stale data on failure.
 
 val model = catalog.find(ModelKey(providerId = "openai", modelId = "gpt-4o"))
+val canonical = catalog.findCanonical("gpt-4o")
 ```
 
-Catalog identities are always provider-qualified. Model IDs are opaque and are never rewritten.
+Provider catalog identities are always provider-qualified. Canonical lookup accepts a full canonical ID or a unique bare ID, returning `null` when a bare ID is ambiguous. Model IDs are opaque and are never rewritten.

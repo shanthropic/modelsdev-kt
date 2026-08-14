@@ -24,8 +24,10 @@ public class ModelsDevParser(
             ?: throw IllegalArgumentException("models.dev catalog root must be an object")
         val providers = linkedMapOf<String, ProviderDescriptor>()
         val models = linkedMapOf<ModelKey, ModelDescriptor>()
+        val canonicalModels = linkedMapOf<String, ModelDescriptor>()
+        val providerRoot = root.obj("providers") ?: root
 
-        root.forEach { (providerMapKey, providerElement) ->
+        providerRoot.forEach { (providerMapKey, providerElement) ->
             val provider = providerElement as? JsonObject ?: return@forEach
             val providerId = provider.string("id")?.takeIf(String::isNotBlank) ?: providerMapKey
             if (providerId.isBlank()) return@forEach
@@ -40,48 +42,60 @@ public class ModelsDevParser(
                 val model = modelElement as? JsonObject ?: return@modelLoop
                 val modelId = model.string("id")?.takeIf(String::isNotBlank) ?: modelMapKey
                 if (modelId.isBlank()) return@modelLoop
-                val limit = model.obj("limit")
-                val modalities = model.obj("modalities")
                 val key = ModelKey(providerId, modelId)
-                models[key] = ModelDescriptor(
-                    key = key,
-                    name = model.string("name"),
-                    family = model.string("family"),
-                    description = model.string("description"),
-                    limits = ModelLimits(
-                        contextTokens = limit?.long("context")?.takeIf { it >= 0 },
-                        inputTokens = limit?.long("input")?.takeIf { it >= 0 },
-                        outputTokens = limit?.long("output")?.takeIf { it >= 0 },
-                    ),
-                    capabilities = ModelCapabilities(
-                        toolCalling = model.support("tool_call"),
-                        structuredOutput = model.support("structured_output"),
-                        temperature = model.support("temperature"),
-                        reasoning = model.support("reasoning"),
-                        attachments = model.support("attachment"),
-                        inputModalities = modalities.stringSet("input"),
-                        outputModalities = modalities.stringSet("output"),
-                        interleavedReasoning = model.interleaved(),
-                    ),
-                    pricing = model.obj("cost")?.toPricing(),
-                    lifecycle = when (model.string("status")) {
-                        "alpha" -> ModelLifecycle.ALPHA
-                        "beta" -> ModelLifecycle.BETA
-                        "deprecated" -> ModelLifecycle.DEPRECATED
-                        null -> ModelLifecycle.ACTIVE
-                        else -> ModelLifecycle.UNKNOWN
-                    },
-                    releaseDate = model.string("release_date"),
-                    lastUpdated = model.string("last_updated"),
-                    knowledgeCutoff = model.string("knowledge"),
-                    openWeights = model.boolean("open_weights"),
-                    sourceId = sourceId,
-                )
+                models[key] = model.toDescriptor(key, sourceId)
             }
         }
+        root.obj("models")?.forEach { (modelMapKey, modelElement) ->
+            val model = modelElement as? JsonObject ?: return@forEach
+            val canonicalId = model.string("id")?.takeIf(String::isNotBlank) ?: modelMapKey
+            val separator = canonicalId.indexOf('/')
+            if (separator <= 0 || separator == canonicalId.lastIndex) return@forEach
+            val key = ModelKey(canonicalId.substring(0, separator), canonicalId.substring(separator + 1))
+            canonicalModels[canonicalId] = model.toDescriptor(key, sourceId)
+        }
         if (providers.isEmpty()) throw IllegalArgumentException("models.dev catalog contains no valid providers")
-        return CatalogSnapshot(providers = providers, models = models)
+        return CatalogSnapshot(providers = providers, models = models, canonicalModels = canonicalModels)
     }
+}
+
+private fun JsonObject.toDescriptor(key: ModelKey, sourceId: String): ModelDescriptor {
+    val limit = obj("limit")
+    val modalities = obj("modalities")
+    return ModelDescriptor(
+        key = key,
+        name = string("name"),
+        family = string("family"),
+        description = string("description"),
+        limits = ModelLimits(
+            contextTokens = limit?.long("context")?.takeIf { it >= 0 },
+            inputTokens = limit?.long("input")?.takeIf { it >= 0 },
+            outputTokens = limit?.long("output")?.takeIf { it >= 0 },
+        ),
+        capabilities = ModelCapabilities(
+            toolCalling = support("tool_call"),
+            structuredOutput = support("structured_output"),
+            temperature = support("temperature"),
+            reasoning = support("reasoning"),
+            attachments = support("attachment"),
+            inputModalities = modalities.stringSet("input"),
+            outputModalities = modalities.stringSet("output"),
+            interleavedReasoning = interleaved(),
+        ),
+        pricing = obj("cost")?.toPricing(),
+        lifecycle = when (string("status")) {
+            "alpha" -> ModelLifecycle.ALPHA
+            "beta" -> ModelLifecycle.BETA
+            "deprecated" -> ModelLifecycle.DEPRECATED
+            null -> ModelLifecycle.ACTIVE
+            else -> ModelLifecycle.UNKNOWN
+        },
+        releaseDate = string("release_date"),
+        lastUpdated = string("last_updated"),
+        knowledgeCutoff = string("knowledge"),
+        openWeights = boolean("open_weights"),
+        sourceId = sourceId,
+    )
 }
 
 private fun JsonObject.string(name: String): String? = (this[name] as? JsonPrimitive)?.contentOrNull

@@ -32,6 +32,26 @@ class ModelsDevParserTest {
         assertNull(snapshot.find(ModelKey("openai", "bad")))
     }
 
+    @Test
+    fun parsesCombinedCanonicalAndProviderCatalog() {
+        val snapshot = ModelsDevParser().parse(COMBINED_CATALOG)
+
+        assertEquals(1_048_576L, snapshot.findCanonical("gemini-3.6-flash")?.limits?.contextTokens)
+        assertEquals(65_536L, snapshot.findCanonical("google/gemini-3.6-flash")?.limits?.outputTokens)
+        assertEquals(Support.SUPPORTED, snapshot.findCanonical("gemini-3.6-flash")?.capabilities?.temperature)
+        assertEquals(1_000_000L, snapshot.findCanonical("claude-opus-5")?.limits?.contextTokens)
+        assertEquals(Support.UNSUPPORTED, snapshot.findCanonical("claude-opus-5")?.capabilities?.temperature)
+        assertEquals(1_000_000L, snapshot.find(ModelKey("gateway", "gemini-3.6-flash"))?.limits?.contextTokens)
+    }
+
+    @Test
+    fun canonicalBareIdLookupRejectsAmbiguity() {
+        val snapshot = ModelsDevParser().parse(AMBIGUOUS_CANONICAL_CATALOG)
+
+        assertNull(snapshot.findCanonical("shared"))
+        assertEquals("First", snapshot.findCanonical("lab-a/shared")?.name)
+    }
+
     private companion object {
         const val CATALOG = """
             {
@@ -58,6 +78,49 @@ class ModelsDevParserTest {
                   "bad": "not-an-object"
                 }
               }
+            }
+        """
+
+        const val COMBINED_CATALOG = """
+            {
+              "models": {
+                "google/gemini-3.6-flash": {
+                  "id": "google/gemini-3.6-flash",
+                  "name": "Gemini 3.6 Flash",
+                  "tool_call": true,
+                  "temperature": true,
+                  "limit": {"context": 1048576, "output": 65536}
+                },
+                "anthropic/claude-opus-5": {
+                  "id": "anthropic/claude-opus-5",
+                  "name": "Claude Opus 5",
+                  "tool_call": true,
+                  "temperature": false,
+                  "limit": {"context": 1000000, "output": 128000}
+                }
+              },
+              "providers": {
+                "gateway": {
+                  "id": "gateway",
+                  "name": "Gateway",
+                  "models": {
+                    "gemini-3.6-flash": {
+                      "id": "gemini-3.6-flash",
+                      "limit": {"context": 1000000, "output": 64000}
+                    }
+                  }
+                }
+              }
+            }
+        """
+
+        const val AMBIGUOUS_CANONICAL_CATALOG = """
+            {
+              "models": {
+                "lab-a/shared": {"id": "lab-a/shared", "name": "First"},
+                "lab-b/shared": {"id": "lab-b/shared", "name": "Second"}
+              },
+              "providers": {"gateway": {"id": "gateway", "models": {}}}
             }
         """
     }

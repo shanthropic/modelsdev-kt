@@ -7,9 +7,13 @@ import dev.shantoislam.modelskt.CatalogValidator
 import dev.shantoislam.modelskt.ModelCatalogSource
 
 public data class ModelsDevConfig(
-    public val apiUrl: String = "https://models.dev/api.json",
+    public val apiUrl: String = DEFAULT_CATALOG_URL,
     public val maximumResponseBytes: Long = 8L * 1_024L * 1_024L,
-)
+) {
+    public companion object {
+        public const val DEFAULT_CATALOG_URL: String = "https://models.dev/catalog.json"
+    }
+}
 
 public class ModelsDevCatalogSource(
     private val httpClient: CatalogHttpClient,
@@ -20,6 +24,9 @@ public class ModelsDevCatalogSource(
 
     override fun decode(payload: String): dev.shantoislam.modelskt.CatalogSnapshot =
         parser.parse(payload, sourceId)
+
+    override fun isSnapshotCurrent(snapshot: dev.shantoislam.modelskt.CatalogSnapshot): Boolean =
+        config.apiUrl != ModelsDevConfig.DEFAULT_CATALOG_URL || snapshot.canonicalModels.isNotEmpty()
 
     override suspend fun fetch(validator: CatalogValidator?): CatalogFetchResult {
         val response = httpClient.execute(

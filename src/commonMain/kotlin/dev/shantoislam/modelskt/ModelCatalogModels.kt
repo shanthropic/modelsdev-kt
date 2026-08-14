@@ -72,6 +72,7 @@ public data class ProviderDescriptor(
 public data class CatalogSnapshot(
     public val providers: Map<String, ProviderDescriptor> = emptyMap(),
     public val models: Map<ModelKey, ModelDescriptor> = emptyMap(),
+    public val canonicalModels: Map<String, ModelDescriptor> = emptyMap(),
     public val sourceVersions: Map<String, String> = emptyMap(),
     public val refreshedAtEpochMillis: Long? = null,
 ) {
@@ -79,4 +80,17 @@ public data class CatalogSnapshot(
 
     public fun modelsForProvider(providerId: String): List<ModelDescriptor> =
         models.values.filter { it.key.providerId == providerId }
+
+    public fun findCanonical(modelId: String): ModelDescriptor? {
+        val normalized = modelId.trim()
+        canonicalModels[normalized]?.let { return it }
+        val candidates = canonicalModels.filterKeys { canonicalId ->
+            if ('/' in normalized) {
+                canonicalId.equals(normalized, ignoreCase = true)
+            } else {
+                canonicalId.substringAfterLast('/').equals(normalized, ignoreCase = true)
+            }
+        }.values
+        return candidates.singleOrNull()
+    }
 }
