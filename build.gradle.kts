@@ -57,8 +57,8 @@ publishing {
             url.set("https://github.com/shantoislam/models-kt")
             licenses {
                 license {
-                    name.set("Apache License 2.0")
-                    url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                    name.set("MIT License")
+                    url.set("https://opensource.org/licenses/MIT")
                 }
             }
         }
